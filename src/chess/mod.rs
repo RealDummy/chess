@@ -65,7 +65,13 @@ fn parse_simple_input(input: &str, player: piece::Player) -> Result::<pos::MoveC
 
 impl Game{
     pub fn new() -> Self{
-        let board = board::Board::from_fen("8/6K1/8/5k2/8/r7/6p1/8 b - - 1 47");
+        let board = board::Board::new();
+        Self {
+            board,
+        }
+    }
+    pub fn from_fen(fen: &str) -> Self {
+        let board = board::Board::from_fen(fen);
         Self {
             board,
         }
