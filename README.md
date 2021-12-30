@@ -13,6 +13,7 @@ It has always been my hope that I could use this to power a chess bot one day, a
 
 ### Less (bad) features
 "Within C++, there is a much smaller and cleaner language struggling to get out" -Bjarne Stroustrup
+
 C++ has been around for a very long time. We have learned a lot of things about programming since then. C++ is not only used to solve the problems of today, but also the problems of years ago. Rust feels like that smaller and cleaner language trying to escape.
 
 ### Super Iterators
@@ -24,6 +25,7 @@ Enumerations in C++ are a disaster. They are numbers, but worse. When the enum s
 ### Chainsaw Monkey
 One of my professors said coding in C was like a monkey with a chainsaw. C++, while in practice is better than C, still allows you to code yourself into a very bad situation. Most of the things that make C++ less dangerous are guidelines that the compiler can't enforce. Rust's const correctness and borrowing concept together cover a very large portion of things that can go wrong in C++.
 Variables are const in Rust by default, which catches more potential bugs than I imagined. For example, I was borrowing a vector of chess pieces, iterating through them, and doing some things to each piece. The whole process was supposed to be const, but the compiler said I needed to make a variable mutable in order for my code to work. That didn't seem right to me, and it turns out one of the operations I was doing to the pieces was mutating them. This would have been a tricky bug to catch in C++ if I wasn't counting everything, and the Rust compiler caught it for me.
+ 
 One of the biggest C++ headaches is passing by value, reference or r-value reference. Rust avoids all this headache by never implicitly copying variables. Ever. If that isn't exciting to you, I don't know what to tell you. Variables are moved by default, and then instead of just slapping a null in the old variable and calling it good, Rust will not allow you to use the old variable again. What exactly happens is a little complicated, but at least the complexity can't result in copying a string 100 times.
 
 ### Summary
