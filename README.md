@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Chess
 A pretty basic chess game made in rust. I am not saying this is a fast implementation of chess, no bitboards or whatever are being used, but it is playable.
 
@@ -29,9 +28,4 @@ One of the biggest C++ headaches is passing by value, reference or r-value refer
 
 ### Summary
 I feel for any small project that doesn't have legacy code, Rust offers several distinct advantages over C++. The newness of the language can be frustrating. If you can get over that, Rust is a very powerful language that I feel works very well for my chess coding needs.
-=======
-# CHESS
-A pretty basic chess game made in rust. I am not saying this is a fast implementation of chess, no bitboards or whatever are being used, but it is playable.
 
-
->>>>>>> 5a739f535656fe995504f3832fae018193cce08b
