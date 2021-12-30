@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 # Chess
-A very basic implementation of chess in Rust.
+A pretty basic chess game made in rust. I am not saying this is a fast implementation of chess, no bitboards or whatever are being used, but it is playable.
+
+## future additions
+I would like to figure out all this chess programing stuff and make a real contender for a fast, efficient chess game, and also I would like to impliment a basic
+board evaluation feature to create a simple chess bot. That would be fun.
 
 ## Why Rust
 I feel like any time one wishes to write code in an uncommon language, the first question that will be asked is "Why?" With good reason too. The tooling is often worse, the community less matured. Maybe most importantly, there will be less people that understand the code. These are all good points. Below are some reasons I chose to learn Rust to make chess, instead of C++.
@@ -24,3 +29,9 @@ One of the biggest C++ headaches is passing by value, reference or r-value refer
 
 ### Summary
 I feel for any small project that doesn't have legacy code, Rust offers several distinct advantages over C++. The newness of the language can be frustrating. If you can get over that, Rust is a very powerful language that I feel works very well for my chess coding needs.
+=======
+# CHESS
+A pretty basic chess game made in rust. I am not saying this is a fast implementation of chess, no bitboards or whatever are being used, but it is playable.
+
+
+>>>>>>> 5a739f535656fe995504f3832fae018193cce08b
