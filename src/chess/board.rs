@@ -2,22 +2,27 @@ use termion::{color};
 
 use crate::chess::{pos, piece};
 
-use piece::*;
+use piece::{Piece, Player};
 
 use std::vec::Vec;
-
+type Squares = [[piece::Piece; 8]; 8];
+//A chess piece, and where it is on the board
+//used in a vector for a piece orineted view of the board
 #[derive(Clone)]
 pub struct PieceState {
     pub piece_type: Piece,
     pub pos: pos::Square,
 }
 
+//players castleing rights, it should be noted that 
+//the kindside and queenside are mirrored for the diff. colors
 #[derive(Clone)]
 struct CastleRights {
     pub kingside: bool,
     pub queenside: bool,
 }
 
+// gcm of the dist between 2 pieces lookup table
 const FACTOR_LOOKUP: [[i8; 8]; 8] = [
     [8, 1, 2, 3, 4, 5, 6, 7],
     [1, 1, 1, 1, 1, 1, 1, 1],
@@ -29,6 +34,7 @@ const FACTOR_LOOKUP: [[i8; 8]; 8] = [
     [7, 1, 1, 1, 1, 1, 1, 7],
 ];
 
+// used to figure out if a piece can attack another piece, probably stupid
 pub fn chess_factor(old_pos: pos::Square, new_pos: pos::Square) -> pos::Square {
     let rank_diff = new_pos.rank - old_pos.rank;
     let file_diff = new_pos.file - old_pos.file;
@@ -41,7 +47,8 @@ pub fn chess_factor(old_pos: pos::Square, new_pos: pos::Square) -> pos::Square {
     }
 }
 
-fn pieces_generator(player: piece::Player, squares: &[[piece::Piece; 8]; 8]) -> std::vec::Vec::<PieceState> {
+//generates a piece oriented view from a square oriented view
+fn pieces_generator(player: piece::Player, squares: &Squares) -> std::vec::Vec::<PieceState> {
     squares.iter()
                 .flatten()
                 .enumerate()
@@ -122,7 +129,7 @@ impl PieceState {
 
 #[derive(Clone)]
 pub struct Board{
-    squares : [[piece::Piece; 8]; 8],
+    squares : Squares,
     move_count: u32,
     last_pawn_move: u32,
     last_move: Option::<pos::Move>,
@@ -220,6 +227,7 @@ impl Board{
             false
 
         });
+        //castling rights
         let mut black_castle_rights = CastleRights {kingside: false, queenside: false};
         let mut white_castle_rights = CastleRights {kingside: false, queenside: false};
         chiter.any(|c| {
@@ -266,11 +274,18 @@ impl Board{
             active_player,
             white_castle_rights,
             black_castle_rights,
-
-
         }
 
     }
+
+    pub fn any_piece_attacking_except(&self, enemy: Player, square: pos::Square, except: pos::Square) -> bool {
+        self.get_pieces(enemy)
+        .iter()
+        .filter(|piece| piece.pos != except)
+        //if any enemy piece is atacking the where the king could be
+        .any(|enemy_piece| enemy_piece.is_attacking(&self, square))
+    }
+
     pub fn any_piece_attacking(&self, enemy: Player, square: pos::Square) -> bool {
         self.get_pieces(enemy)
         .iter()
@@ -379,7 +394,7 @@ impl Board{
         };
         
     }
-    pub fn en_passant_possible(&self, player: piece::Player, attacking_pawn_pos: pos::Square) -> bool {
+    pub fn en_passant_possible(&self, player: piece::Player, attacking_pawn_pos: pos::Square, end: pos::Square) -> bool {
         if self.last_pawn_move < self.move_count {
             false
         }
@@ -391,7 +406,7 @@ impl Board{
             {
                 if let Some(last_moved_pawn) = &self.last_move {
                     if (last_moved_pawn.new_pos - last_moved_pawn.old_pos).rank == 2 {
-                        (attacking_pawn_pos.file - last_moved_pawn.new_pos.file).abs() == 1
+                        end - pos::Square{rank: player.sign(), file: 0} == last_moved_pawn.new_pos
                     }
                     else{
                         false
@@ -406,21 +421,24 @@ impl Board{
             }
         }
     }
+    // moves a piece and updates its piece state in the piece oriented view
     fn move_piece(&mut self, owner: Player, old_pos: pos::Square, new_pos: pos::Square) {
         let index = self.player_piece_at(owner, old_pos).unwrap();
         let mut state = &mut self.get_pieces_mut(owner)[index];
         state.pos = new_pos; 
         self.force_move(old_pos, new_pos);
     }
+
     pub fn in_check(&self, player_color: Player) -> (Option::<pos::Square>, std::vec::Vec::<pos::Square>) {
+        
         //find king's position
         let king_pos = match self.get_pieces(player_color)
         .iter()
         .find(|p| {
             if let Piece::King(_) = p.piece_type {
                 true
-            }
-            else{
+            } 
+            else {
                 false
             }
         }) {
@@ -474,6 +492,7 @@ impl Board{
             }
             pos::MoveType::EnPassant => {
                 let owner = valid_move.piece.owner().expect("Board Mangled");
+                
                 let captured = owner.invert();
                 let captured_pos = self.get_pieces(captured)
                     .iter()
@@ -511,6 +530,46 @@ impl Board{
             self.last_pawn_move = self.move_count;
         }
         self.active_player = self.active_player.invert();
+    }
+    //for seeing if the king is in check after a move
+    pub fn king_safe_after_move(&mut self, king_pos: pos::Square, temp_move: pos::Move) -> Option::<pos::Move>{
+        use pos::MoveType::*;
+        let king_safe = match temp_move.move_type {
+           Castle(_) => {return Some(temp_move);},
+           EnPassant => {
+               self.force_move(temp_move.old_pos, temp_move.new_pos);
+               let captured_pawn = self.set(
+                   temp_move.new_pos - pos::Square{rank: temp_move.piece.owner().unwrap().sign(), file: 0}, 
+                    piece::Piece::Empty
+                );
+
+                let king_safe = !self.any_piece_attacking(self.active_player().invert(), king_pos);
+                self.force_move(temp_move.new_pos, temp_move.old_pos);
+                self.set(
+                    temp_move.new_pos - pos::Square{rank: temp_move.piece.owner().unwrap().sign(), file: 0}, 
+                    captured_pawn
+                );
+                king_safe
+            },
+           _ => {
+               if let piece::Piece::King(pc) = temp_move.piece {
+                    !self.any_piece_attacking(pc.invert(), temp_move.new_pos)
+                }
+                else{
+                    let captured_piece = self.force_move(temp_move.old_pos, temp_move.new_pos);
+                    let king_safe = !self.any_piece_attacking_except(self.active_player().invert(), king_pos, temp_move.new_pos);
+                    self.force_move(temp_move.new_pos, temp_move.old_pos);
+                    self.set(temp_move.new_pos, captured_piece);
+                    king_safe
+                }
+            }
+        };
+        if king_safe {
+            Some(temp_move)
+        }
+        else{
+            None
+        }
     }
 
     fn force_move(&mut self, old_pos: pos::Square, new_pos: pos::Square) -> Piece{

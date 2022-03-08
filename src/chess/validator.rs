@@ -1,7 +1,15 @@
 use crate::chess::{board, piece, pos};
 use std::vec::Vec;
 
-const PAWN_MOVES: &'static [(i8,i8)] = &[(0,1),(0,1),(0,1),(0,1),(0,1),(0,2),(1,1),(-1,1),];
+const PAWN_START_MOVES: &'static [(i8,i8)] = &[(0,1),(0,2),(1,1),(-1,1),];
+
+const PAWN_MOVES: &'static [(i8,i8)] = &[(0,1),(1,1),(-1,1),];
+
+const PAWN_PROMOTION_MOVES: &'static [(i8,i8)] = &[
+    (0,1),(0,1),(0,1),(0,1),
+    (1,1),(1,1),(1,1),(1,1),
+    (-1,1),(-1,1),(-1,1),(-1,1),
+];
 
 const KNIGHT_MOVES: &'static [(i8,i8)] = &[
     ( 1,  2), ( 2,  1),
@@ -10,10 +18,10 @@ const KNIGHT_MOVES: &'static [(i8,i8)] = &[
     (-2,  1), (-1,  2)
 ];
 const BISHOP_MOVES: &'static [(i8,i8)] = &[
-    ( 1,  1),( 2,  2),( 3,  3),( 4,  4),( 5,  5),( 6,  6),( 7,  7),
-    (-1,  1),(-2,  2),(-3,  3),(-4,  4),(-5,  5),(-6,  6),(-7,  7),
-    ( 1, -1),( 2, -2),( 3, -3),( 4, -4),( 5, -5),( 6, -6),( 7, -7),
-    (-1, -1),(-2, -2),(-3, -3),(-4, -4),(-5, -5),(-6, -6),(-7, -7),
+    ( 1,   1),( 2,   2),( 3,   3),( 4,   4),( 5,   5),( 6,   6),( 7,   7),
+    (-1,   1),(-2,   2),(-3,   3),(-4,   4),(-5,   5),(-6,   6),(-7,   7),
+    ( 1,  -1),( 2,  -2),( 3,  -3),( 4,  -4),( 5,  -5),( 6,  -6),( 7,  -7),
+    (-1,  -1),(-2,  -2),(-3,  -3),(-4,  -4),(-5,  -5),(-6,  -6),(-7,  -7),
 ];
 const ROOK_MOVES: &'static [(i8,i8)] = &[
     ( 0,  1), ( 0,  2), ( 0,  3), ( 0,  4), ( 0,  5), ( 0,  6), ( 0,  7),
@@ -66,8 +74,12 @@ fn get_move_dir(old_pos: pos::Square, new_pos: pos::Square) -> pos::Square{
     )
 }
 
-pub fn legal_move(board: &board::Board, move_candidate: pos::MoveCandidate,
-    check_tuple: &(Option::<pos::Square>, std::vec::Vec::<pos::Square>) ) -> Option<pos::Move> {   
+pub fn legal_move(
+    board: &board::Board, 
+    move_candidate: pos::MoveCandidate,
+    check_tuple: &(Option::<pos::Square>, std::vec::Vec::<pos::Square>) 
+) -> Option<pos::Move> 
+{   
     let pos::MoveCandidate{ old_pos, new_pos, promote_to } = move_candidate;
     let piece_type = board.get(old_pos);
     use piece::Piece::*;
@@ -77,16 +89,15 @@ pub fn legal_move(board: &board::Board, move_candidate: pos::MoveCandidate,
     if piece_type.owner() == board.get(new_pos).owner() {
         return None;
     }
-
     let potential_move = match piece_type {
         Pawn(pc) => {
             
             let enemy_piece_type = board.get(new_pos);
             match enemy_piece_type.owner() {
-                //not attacking(or en passant attacking)
+                //not attacking (or is en passant attacking)
                 None => {
                     if get_move_dir(old_pos, new_pos).file != 0 { //en passant
-                        if board.en_passant_possible(pc,old_pos) {
+                        if board.en_passant_possible(pc,old_pos, new_pos) {
                             Some(pos::Move{
                                 move_type: pos::MoveType::EnPassant,
                                 old_pos,
@@ -96,6 +107,20 @@ pub fn legal_move(board: &board::Board, move_candidate: pos::MoveCandidate,
                         }
                         else {
                             return None;
+                        }
+                    }
+                    else if (old_pos.rank - new_pos.rank).abs() == 2 {
+                        if let Some(_) = board.get(old_pos + pos::Square{rank: 1 * player_sign(piece_type), file: 0}).owner() {
+                            return None;
+                        }
+                        else {
+                            let move_type = pos::MoveType::Move;
+                            Some(pos::Move{
+                                move_type,
+                                old_pos,
+                                new_pos,
+                                piece: piece_type,
+                            })
                         }
                     }
                     else {
@@ -183,7 +208,7 @@ pub fn legal_move(board: &board::Board, move_candidate: pos::MoveCandidate,
                 2|-2 => { //king castles
                     //no castleing in check
                     if let (Some(_), _) = check_tuple {
-                        if check_tuple.1.len() > 0{
+                        if check_tuple.1.len() > 0 {
                             return None;
                         }
                     }
@@ -247,8 +272,7 @@ pub fn legal_move(board: &board::Board, move_candidate: pos::MoveCandidate,
                         piece: piece_type,
                     })
                 }
-                
-                _ => { //any other king move
+                _ => { //any other king move AKA not castleing
                     let enemy_piece_type = board.get(new_pos);
                     //move already known to not move into check
                     match enemy_piece_type.owner() {
@@ -290,7 +314,7 @@ pub fn legal_move(board: &board::Board, move_candidate: pos::MoveCandidate,
                         return None;
                     }
                 }
-                _ => { //is a sliding piece or pawn
+                _ => { //attacking piece is a sliding piece or pawn
                     let dir = get_move_dir(check_square, *king_pos);
                     let mut curr_check_blocked = false;
                     while sliding_square != *king_pos {
@@ -312,7 +336,73 @@ pub fn legal_move(board: &board::Board, move_candidate: pos::MoveCandidate,
     Some(potential_move)
 }
 
-pub fn get_possible_moves_from_square(
+pub fn get_possible_moves(board: &mut board::Board) -> std::vec::Vec::<pos::Move> {
+    use piece::Piece::*;
+    let mut last_pawn_promotion: Option::<piece::Piece> = None; //invalid state that gets turned to none later
+    let check_tuple = board.in_check(board.active_player());
+    board.get_pieces(board.active_player()).clone().iter()
+        .map(|piece|{match piece.piece_type {
+            Empty     => &[],
+            Pawn(_)   => match piece.piece_type.owner().unwrap() {
+                piece::Player::Black => match piece.pos.rank {
+                    2 => PAWN_PROMOTION_MOVES,
+                    7 => PAWN_START_MOVES,
+                    _ => PAWN_MOVES,
+                }
+                piece::Player::White => match piece.pos.rank {
+                    7 => PAWN_PROMOTION_MOVES,
+                    2 => PAWN_START_MOVES,
+                    _ => PAWN_MOVES,
+                }
+            },
+            Knight(_) => KNIGHT_MOVES,
+            Bishop(_) => BISHOP_MOVES,
+            Rook(_)   => ROOK_MOVES,
+            Queen(_)  => QUEEN_MOVES,
+            King(_)   => KING_MOVES,
+        }.iter()
+        .map(|(f,r)|{pos::Square {
+            file: piece.pos.file + f * player_sign(piece.piece_type),
+            rank: piece.pos.rank + r * player_sign(piece.piece_type)
+        }})
+        .filter(|pos| {
+            on_board(pos)
+        })
+        .map(|pos| {(piece.clone(), pos)}) //kind of a stupid clone here
+    }).flatten()
+    .filter_map(|(piece, new_pos)| {
+        last_pawn_promotion = if let Pawn(_) = piece.piece_type {
+            match last_pawn_promotion {
+                None             => Some(Queen(board.active_player())),
+                Some(Queen(pc))  => Some(Rook(pc)),
+                Some(Rook(pc))   => Some(Bishop(pc)),
+                Some(Bishop(pc)) => Some(Knight(pc)),
+                Some(Knight(pc)) => Some(Queen(pc)),
+                _ => None, //shouldnt happen...
+            }
+        }
+        else {
+            None
+        };
+        let move_candidate = pos::MoveCandidate {
+            old_pos: piece.pos,
+            new_pos,
+            promote_to: last_pawn_promotion,
+        };
+        match legal_move(board, move_candidate, &check_tuple) {
+            Some(m) => {
+                match check_tuple.0 {
+                    Some(kp) => board.king_safe_after_move(kp, m),
+                    None => Some(m),
+                }
+            }
+            None => None,
+        }
+    })
+    .collect()
+}
+
+/*pub fn get_possible_moves_from_square(
     board: &board::Board, 
     piece_pos: pos::Square, 
     check_tuple: &(Option::<pos::Square>, std::vec::Vec::<pos::Square>)
@@ -364,3 +454,4 @@ pub fn get_possible_moves_from_square(
         })
         .collect()
 }
+*/
